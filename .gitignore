@@ -11,8 +11,37 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files (CRITICAL - never commit passwords/secrets)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Database
+*.sqlite
+*.db
+
+# File uploads and generated content
+/uploads
+/pdfs
+/temp
+/tmp
+
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Tests
 /coverage
@@ -26,6 +55,9 @@ lerna-debug.log*
 *.launch
 .settings/
 *.sublime-workspace
+*.swp
+*.swo
+*~
 
 # IDE - VSCode
 .vscode/*
@@ -33,3 +65,28 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Build files
+build/
+
+# Dependency directories
+jspm_packages/
+
+# Optional REPL history
+.node_repl_history

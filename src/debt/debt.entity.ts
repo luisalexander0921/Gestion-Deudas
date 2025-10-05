@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { CreditorEntity } from '../creditor/creditor.entity';
 import { DebtStatus, RecordStatus } from '../common/enums';
 
 @Entity({ name: 'debts' })
@@ -21,14 +22,8 @@ export class DebtEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 100 })
-  debtorName: string;
-
-  @Column({ length: 100, nullable: true })
-  debtorEmail: string;
-
-  @Column({ length: 20, nullable: true })
-  debtorPhone: string;
+  @Column({ nullable: true })
+  creditorId: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   amount: number;
@@ -55,4 +50,9 @@ export class DebtEntity {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  // Relación con Creditor (acreedor)
+  @ManyToOne(() => CreditorEntity, (creditor) => creditor.debts)
+  @JoinColumn({ name: 'creditorId' })
+  creditor: CreditorEntity;
 }

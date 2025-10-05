@@ -3,10 +3,6 @@ import { DebtStatus } from '../../common/enums';
 
 export class FilterDebtDto {
   @IsOptional()
-  @IsString()
-  debtorName?: string;
-
-  @IsOptional()
   @IsEnum(DebtStatus)
   status?: DebtStatus;
 

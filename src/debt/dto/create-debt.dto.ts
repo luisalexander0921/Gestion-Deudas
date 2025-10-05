@@ -2,20 +2,8 @@ import { IsString, IsEmail, IsOptional, IsNumber, IsDateString, MaxLength, MinLe
 import { DebtStatus } from '../../common/enums';
 
 export class CreateDebtDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  debtorName: string;
-
-  @IsOptional()
-  @IsEmail()
-  @MaxLength(100)
-  debtorEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  debtorPhone?: string;
+  @IsNumber()
+  creditorId: number;
 
   @IsNumber()
   @IsPositive()

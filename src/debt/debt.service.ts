@@ -21,17 +21,17 @@ export class DebtService {
         throw new HttpException('El monto de la deuda debe ser mayor a cero', HttpStatus.BAD_REQUEST);
       }
 
-      // Verificar si ya existe una deuda con el mismo nombre y estado PENDING
+      // Verificar si ya existe una deuda pendiente para este acreedor
       const existingDebt = await this.debtRepository.findOne({
         where: {
-          debtorName: createDebtDto.debtorName,
+          creditorId: createDebtDto.creditorId,
           status: DebtStatus.PENDING,
           recordStatus: RecordStatus.ACTIVE,
         },
       });
 
       if (existingDebt) {
-        throw new HttpException('Ya existe una deuda pendiente para este deudor', HttpStatus.CONFLICT);
+        throw new HttpException('Ya existe una deuda pendiente para este acreedor', HttpStatus.CONFLICT);
       }
 
       const debtData = {
@@ -52,7 +52,7 @@ export class DebtService {
     try {
       return this.debtRepository.find({
         where: { recordStatus: RecordStatus.ACTIVE },
-        relations: ['user'],
+        relations: ['user', 'creditor'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -64,7 +64,7 @@ export class DebtService {
     try {
       const debt = await this.debtRepository.findOne({
         where: { id, recordStatus: RecordStatus.ACTIVE },
-        relations: ['user'],
+        relations: ['user', 'creditor'],
       });
 
       if (!debt) {
@@ -126,10 +126,6 @@ export class DebtService {
     try {
       const whereConditions: any = { recordStatus: RecordStatus.ACTIVE };
 
-      if (filterDto.debtorName) {
-        whereConditions.debtorName = ILike(`%${filterDto.debtorName}%`);
-      }
-
       if (filterDto.status) {
         whereConditions.status = filterDto.status;
       }
@@ -153,7 +149,7 @@ export class DebtService {
 
       return this.debtRepository.find({
         where: whereConditions,
-        relations: ['user'],
+        relations: ['user', 'creditor'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -165,7 +161,7 @@ export class DebtService {
     try {
       return this.debtRepository.find({
         where: { userId, recordStatus: RecordStatus.ACTIVE },
-        relations: ['user'],
+        relations: ['user', 'creditor'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -181,7 +177,7 @@ export class DebtService {
           status: DebtStatus.PENDING, 
           recordStatus: RecordStatus.ACTIVE 
         },
-        relations: ['user'],
+        relations: ['user', 'creditor'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -197,7 +193,7 @@ export class DebtService {
           status: DebtStatus.PAID, 
           recordStatus: RecordStatus.ACTIVE 
         },
-        relations: ['user'],
+        relations: ['user', 'creditor'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {

@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { DebtModule } from './debt/debt.module';
+import { CreditorModule } from './creditor/creditor.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
@@ -25,6 +26,7 @@ import databaseConfig from './config/database.config';
     AuthModule,
     UsersModule,
     DebtModule,
+    CreditorModule,
   ],
   controllers: [AppController],
   providers: [AppService],

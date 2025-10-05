@@ -140,4 +140,66 @@ export class DebtService {
       throw new HttpException('Error al filtrar las deudas', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  async getDebtsByUser(userId: number): Promise<DebtEntity[]> {
+    try {
+      return this.debtRepository.find({
+        where: { userId, recordStatus: 'ACTIVE' },
+        relations: ['user'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      throw new HttpException('Error al obtener las deudas del usuario', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async getPendingDebtsByUser(userId: number): Promise<DebtEntity[]> {
+    try {
+      return this.debtRepository.find({
+        where: { 
+          userId, 
+          status: 'PENDING', 
+          recordStatus: 'ACTIVE' 
+        },
+        relations: ['user'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      throw new HttpException('Error al obtener las deudas pendientes del usuario', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async getPaidDebtsByUser(userId: number): Promise<DebtEntity[]> {
+    try {
+      return this.debtRepository.find({
+        where: { 
+          userId, 
+          status: 'PAID', 
+          recordStatus: 'ACTIVE' 
+        },
+        relations: ['user'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      throw new HttpException('Error al obtener las deudas pagadas del usuario', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async markAsPaid(id: number): Promise<DebtEntity> {
+    try {
+      const debt = await this.getOne(id);
+      
+      if (debt.status === 'PAID') {
+        throw new HttpException('La deuda ya está marcada como pagada', HttpStatus.BAD_REQUEST);
+      }
+
+      debt.status = 'PAID';
+      return this.debtRepository.save(debt);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException('Error al marcar la deuda como pagada', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsEnum } from 'class-validator';
+import { DebtStatus } from '../../common/enums';
 
 export class FilterDebtDto {
   @IsOptional()
@@ -6,8 +7,8 @@ export class FilterDebtDto {
   debtorName?: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(DebtStatus)
+  status?: DebtStatus;
 
   @IsOptional()
   @IsDateString()

@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { DebtStatus, RecordStatus } from '../common/enums';
 
 @Entity({ name: 'debts' })
 export class DebtEntity {
@@ -38,11 +39,11 @@ export class DebtEntity {
   @Column({ type: 'date' })
   dueDate: Date;
 
-  @Column({ default: 'PENDING' })
-  status: string; // PENDING, PAID, OVERDUE, CANCELLED
+  @Column({ type: 'enum', enum: DebtStatus, default: DebtStatus.PENDING })
+  status: DebtStatus;
 
-  @Column({ default: 'ACTIVE' })
-  recordStatus: string; // ACTIVE, INACTIVE - para soft delete
+  @Column({ type: 'enum', enum: RecordStatus, default: RecordStatus.ACTIVE })
+  recordStatus: RecordStatus;
 
   @Column({ nullable: true, length: 30 })
   createdBy: string;

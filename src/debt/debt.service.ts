@@ -5,6 +5,7 @@ import { DebtEntity } from './debt.entity';
 import { CreateDebtDto } from './dto/create-debt.dto';
 import { UpdateDebtDto } from './dto/update-debt.dto';
 import { FilterDebtDto } from './dto/filter-debt.dto';
+import { DebtStatus, RecordStatus } from '../common/enums';
 
 @Injectable()
 export class DebtService {
@@ -15,12 +16,17 @@ export class DebtService {
 
   async create(createDebtDto: CreateDebtDto): Promise<DebtEntity> {
     try {
+      // Validar que el monto no sea negativo
+      if (createDebtDto.amount <= 0) {
+        throw new HttpException('El monto de la deuda debe ser mayor a cero', HttpStatus.BAD_REQUEST);
+      }
+
       // Verificar si ya existe una deuda con el mismo nombre y estado PENDING
       const existingDebt = await this.debtRepository.findOne({
         where: {
           debtorName: createDebtDto.debtorName,
-          status: 'PENDING',
-          recordStatus: 'ACTIVE',
+          status: DebtStatus.PENDING,
+          recordStatus: RecordStatus.ACTIVE,
         },
       });
 
@@ -28,8 +34,11 @@ export class DebtService {
         throw new HttpException('Ya existe una deuda pendiente para este deudor', HttpStatus.CONFLICT);
       }
 
-      createDebtDto.status = createDebtDto.status || 'PENDING';
-      const debt = this.debtRepository.create(createDebtDto);
+      const debtData = {
+        ...createDebtDto,
+        status: createDebtDto.status || DebtStatus.PENDING,
+      };
+      const debt = this.debtRepository.create(debtData);
       return this.debtRepository.save(debt);
     } catch (error) {
       if (error instanceof HttpException) {
@@ -42,7 +51,7 @@ export class DebtService {
   async getAll(): Promise<DebtEntity[]> {
     try {
       return this.debtRepository.find({
-        where: { recordStatus: 'ACTIVE' },
+        where: { recordStatus: RecordStatus.ACTIVE },
         relations: ['user'],
         order: { createdAt: 'DESC' },
       });
@@ -54,7 +63,7 @@ export class DebtService {
   async getOne(id: number): Promise<DebtEntity> {
     try {
       const debt = await this.debtRepository.findOne({
-        where: { id, recordStatus: 'ACTIVE' },
+        where: { id, recordStatus: RecordStatus.ACTIVE },
         relations: ['user'],
       });
 
@@ -74,6 +83,17 @@ export class DebtService {
   async update(id: number, updateDebtDto: UpdateDebtDto): Promise<DebtEntity> {
     try {
       const debt = await this.getOne(id);
+      
+      // Validar que no se pueda modificar una deuda pagada
+      if (debt.status === DebtStatus.PAID) {
+        throw new HttpException('No se puede modificar una deuda que ya está pagada', HttpStatus.BAD_REQUEST);
+      }
+
+      // Validar que el nuevo monto no sea negativo (si se está actualizando)
+      if (updateDebtDto.amount !== undefined && updateDebtDto.amount <= 0) {
+        throw new HttpException('El monto de la deuda debe ser mayor a cero', HttpStatus.BAD_REQUEST);
+      }
+
       Object.assign(debt, updateDebtDto);
       return this.debtRepository.save(debt);
     } catch (error) {
@@ -88,7 +108,7 @@ export class DebtService {
     try {
       const result = await this.debtRepository.update(
         { id },
-        { recordStatus: 'INACTIVE' }
+        { recordStatus: RecordStatus.INACTIVE }
       );
 
       if (result.affected === 0) {
@@ -104,7 +124,7 @@ export class DebtService {
 
   async getFilteredDebts(filterDto: FilterDebtDto): Promise<DebtEntity[]> {
     try {
-      const whereConditions: any = { recordStatus: 'ACTIVE' };
+      const whereConditions: any = { recordStatus: RecordStatus.ACTIVE };
 
       if (filterDto.debtorName) {
         whereConditions.debtorName = ILike(`%${filterDto.debtorName}%`);
@@ -144,7 +164,7 @@ export class DebtService {
   async getDebtsByUser(userId: number): Promise<DebtEntity[]> {
     try {
       return this.debtRepository.find({
-        where: { userId, recordStatus: 'ACTIVE' },
+        where: { userId, recordStatus: RecordStatus.ACTIVE },
         relations: ['user'],
         order: { createdAt: 'DESC' },
       });
@@ -158,8 +178,8 @@ export class DebtService {
       return this.debtRepository.find({
         where: { 
           userId, 
-          status: 'PENDING', 
-          recordStatus: 'ACTIVE' 
+          status: DebtStatus.PENDING, 
+          recordStatus: RecordStatus.ACTIVE 
         },
         relations: ['user'],
         order: { createdAt: 'DESC' },
@@ -174,8 +194,8 @@ export class DebtService {
       return this.debtRepository.find({
         where: { 
           userId, 
-          status: 'PAID', 
-          recordStatus: 'ACTIVE' 
+          status: DebtStatus.PAID, 
+          recordStatus: RecordStatus.ACTIVE 
         },
         relations: ['user'],
         order: { createdAt: 'DESC' },
@@ -189,11 +209,11 @@ export class DebtService {
     try {
       const debt = await this.getOne(id);
       
-      if (debt.status === 'PAID') {
+      if (debt.status === DebtStatus.PAID) {
         throw new HttpException('La deuda ya está marcada como pagada', HttpStatus.BAD_REQUEST);
       }
 
-      debt.status = 'PAID';
+      debt.status = DebtStatus.PAID;
       return this.debtRepository.save(debt);
     } catch (error) {
       if (error instanceof HttpException) {

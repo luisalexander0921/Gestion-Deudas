@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { UserStatus } from '../common/enums';
 
 @Injectable()
 export class UsersService {
@@ -34,14 +35,14 @@ export class UsersService {
 
   async findAll(): Promise<User[]> {
     return this.userRepository.find({
-      where: { status: 'ACTIVE' },
+      where: { status: UserStatus.ACTIVE },
       select: ['id', 'username', 'email', 'fullName', 'status', 'createdAt', 'updatedAt'],
     });
   }
 
   async findOne(id: number): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id, status: 'ACTIVE' },
+      where: { id, status: UserStatus.ACTIVE },
       select: ['id', 'username', 'email', 'fullName', 'status', 'createdAt', 'updatedAt'],
     });
 
@@ -59,7 +60,7 @@ export class UsersService {
   }
 
   async remove(id: number): Promise<void> {
-    const result = await this.userRepository.update(id, { status: 'INACTIVE' });
+    const result = await this.userRepository.update(id, { status: UserStatus.INACTIVE });
     
     if (result.affected === 0) {
       throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);

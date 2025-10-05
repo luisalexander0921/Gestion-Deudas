@@ -6,6 +6,7 @@ import { User } from '../users/entities/user.entity';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
+import { UserStatus } from '../common/enums';
 
 @Injectable()
 export class AuthService {
@@ -52,7 +53,7 @@ export class AuthService {
     try {
       // Buscar usuario por nombre de usuario
       const user = await this.userRepository.findOne({
-        where: { username: loginDto.username, status: 'ACTIVE' },
+        where: { username: loginDto.username, status: UserStatus.ACTIVE },
       });
 
       if (!user) {

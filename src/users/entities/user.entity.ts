@@ -8,6 +8,7 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { UserStatus } from '../../common/enums';
 
 @Entity({ name: 'users' })
 export class User {
@@ -26,8 +27,8 @@ export class User {
   @Column({ length: 100, nullable: true })
   fullName: string;
 
-  @Column({ default: 'ACTIVE' })
-  status: string;
+  @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
+  status: UserStatus;
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;

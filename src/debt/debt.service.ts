@@ -40,10 +40,14 @@ export class DebtService {
     }
   }
 
-  async getAll(): Promise<DebtEntity[]> {
+  async getAll(userId?: number): Promise<DebtEntity[]> {
     try {
+      if (!userId) {
+        return [];
+      }
+
       return this.debtRepository.find({
-        where: { recordStatus: RecordStatus.ACTIVE },
+        where: { userId, recordStatus: RecordStatus.ACTIVE },
         relations: ['user', 'creditor', 'payments'],
         order: { createdAt: 'DESC' },
       });
@@ -52,10 +56,16 @@ export class DebtService {
     }
   }
 
-  async getOne(id: number): Promise<DebtEntity> {
+  async getOne(id: number, userId?: number): Promise<DebtEntity> {
     try {
+      const whereConditions: any = { id, recordStatus: RecordStatus.ACTIVE };
+      
+      if (userId) {
+        whereConditions.userId = userId;
+      }
+
       const debt = await this.debtRepository.findOne({
-        where: { id, recordStatus: RecordStatus.ACTIVE },
+        where: whereConditions,
         relations: ['user', 'creditor', 'payments'],
       });
 
@@ -72,9 +82,9 @@ export class DebtService {
     }
   }
 
-  async update(id: number, updateDebtDto: UpdateDebtDto): Promise<DebtEntity> {
+  async update(id: number, updateDebtDto: UpdateDebtDto, userId?: number): Promise<DebtEntity> {
     try {
-      const debt = await this.getOne(id);
+      const debt = await this.getOne(id, userId);
       
       if (debt.status === DebtStatus.PAID) {
         throw new HttpException('No se puede modificar una deuda que ya está pagada', HttpStatus.BAD_REQUEST);
@@ -112,9 +122,13 @@ export class DebtService {
     }
   }
 
-  async getFilteredDebts(filterDto: FilterDebtDto): Promise<DebtEntity[]> {
+  async getFilteredDebts(filterDto: FilterDebtDto, userId?: number): Promise<DebtEntity[]> {
     try {
       const whereConditions: any = { recordStatus: RecordStatus.ACTIVE };
+
+      if (userId) {
+        whereConditions.userId = userId;
+      }
 
       if (filterDto.status) {
         whereConditions.status = filterDto.status;
@@ -191,9 +205,9 @@ export class DebtService {
     }
   }
 
-  async markAsPaid(id: number): Promise<DebtEntity> {
+  async markAsPaid(id: number, userId?: number): Promise<DebtEntity> {
     try {
-      const debt = await this.getOne(id);
+      const debt = await this.getOne(id, userId);
       
       if (debt.status === DebtStatus.PAID) {
         throw new HttpException('La deuda ya está marcada como pagada', HttpStatus.BAD_REQUEST);
@@ -203,10 +217,10 @@ export class DebtService {
       await this.createPayment(id, {
         amount: remainingAmount,
         description: 'Pago total de la deuda',
-        userId: debt.userId,
+        userId: userId || debt.userId,
       });
 
-      return this.getOne(id);
+      return this.getOne(id, userId);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -217,7 +231,7 @@ export class DebtService {
 
   async createPayment(debtId: number, createPaymentDto: CreatePaymentDto): Promise<PaymentEntity> {
     try {
-      const debt = await this.getOne(debtId);
+      const debt = await this.getOne(debtId, createPaymentDto.userId);
       
       if (debt.status === DebtStatus.PAID) {
         throw new HttpException('No se pueden hacer pagos a una deuda ya pagada', HttpStatus.BAD_REQUEST);
@@ -243,16 +257,22 @@ export class DebtService {
       const newPaidAmount = currentPaidAmount + paymentAmount;
       const newRemainingAmount = totalAmount - newPaidAmount;
       
-      // Actualizar deuda con consulta SQL directa
       const status = newRemainingAmount <= 0 ? 'PAID' : debt.status;
-      const finalRemainingAmount = newRemainingAmount <= 0 ? 0 : newRemainingAmount;
+      const finalRemainingAmount = Math.max(0, newRemainingAmount);
       
       await this.debtRepository.query(
         'UPDATE debts SET "paidAmount" = $1, "remainingAmount" = $2, status = $3 WHERE id = $4',
         [newPaidAmount, finalRemainingAmount, status, debtId]
       );
-      
-      return savedPayment;
+
+      return {
+        id: savedPayment.id,
+        amount: savedPayment.amount,
+        description: savedPayment.description,
+        debtId: savedPayment.debtId,
+        userId: savedPayment.userId,
+        createdAt: savedPayment.createdAt,
+      } as PaymentEntity;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -263,11 +283,19 @@ export class DebtService {
 
   async getPaymentsByDebt(debtId: number): Promise<PaymentEntity[]> {
     try {
-      return this.paymentRepository.find({
-        where: { debtId },
-        relations: ['user'],
-        order: { createdAt: 'DESC' },
-      });
+      const result = await this.paymentRepository.query(
+        'SELECT * FROM payments WHERE "debtId" = $1 ORDER BY "createdAt" DESC',
+        [debtId]
+      );
+      
+      return result.map(payment => ({
+        id: payment.id,
+        amount: payment.amount,
+        description: payment.description,
+        debtId: payment.debtId,
+        userId: payment.userId,
+        createdAt: payment.createdAt,
+      })) as PaymentEntity[];
     } catch (error) {
       throw new HttpException('Error al obtener los pagos de la deuda', HttpStatus.INTERNAL_SERVER_ERROR);
     }

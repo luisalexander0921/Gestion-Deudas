@@ -9,6 +9,8 @@ import {
   ParseIntPipe,
   UsePipes,
   ValidationPipe,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { DebtService } from './debt.service';
 import { CreateDebtDto } from './dto/create-debt.dto';
@@ -17,35 +19,42 @@ import { FilterDebtDto } from './dto/filter-debt.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { DebtEntity } from './debt.entity';
 import { PaymentEntity } from './payment.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('debt')
+@UseGuards(JwtAuthGuard)
 export class DebtController {
   constructor(private debtService: DebtService) {}
 
   // Registra una nueva deuda en el sistema
   @Post()
   @UsePipes(new ValidationPipe({ transform: true }))
-  create(@Body() createDebtDto: CreateDebtDto) {
-    return this.debtService.create(createDebtDto);
+  create(@Body() createDebtDto: CreateDebtDto, @Request() req: any) {
+    const debtWithUser = {
+      ...createDebtDto,
+      userId: req.user?.id
+    };
+    return this.debtService.create(debtWithUser);
   }
 
   // Trae todas las deudas que están activas en la base de datos
   @Get()
-  getAll(): Promise<DebtEntity[]> {
-    return this.debtService.getAll();
+  getAll(@Request() req: any): Promise<DebtEntity[]> {
+    const userId = req.user?.id;
+    return this.debtService.getAll(userId);
   }
 
   // Busca una deuda específica por su ID
   @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
-    return this.debtService.getOne(id);
+  getOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.debtService.getOne(id, req.user?.id);
   }
 
   // Permite modificar los datos de una deuda existente
   @Patch(':id')
   @UsePipes(new ValidationPipe({ transform: true }))
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateDebtDto: UpdateDebtDto) {
-    return this.debtService.update(id, updateDebtDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateDebtDto: UpdateDebtDto, @Request() req: any) {
+    return this.debtService.update(id, updateDebtDto, req.user?.id);
   }
 
   // Elimina una deuda del sistema (no la borra físicamente)
@@ -57,8 +66,8 @@ export class DebtController {
   // Busca deudas aplicando filtros como nombre, estado o fechas
   @Post('filter')
   @UsePipes(new ValidationPipe({ transform: true }))
-  getFilteredDebts(@Body() filterDebtDto: FilterDebtDto) {
-    return this.debtService.getFilteredDebts(filterDebtDto);
+  getFilteredDebts(@Body() filterDebtDto: FilterDebtDto, @Request() req: any) {
+    return this.debtService.getFilteredDebts(filterDebtDto, req.user?.id);
   }
 
   // Obtiene todas las deudas asociadas a un usuario en particular
@@ -81,8 +90,8 @@ export class DebtController {
 
   // Cambia el estado de una deuda a "pagada" de forma rápida
   @Patch(':id/mark-paid')
-  markAsPaid(@Param('id', ParseIntPipe) id: number): Promise<DebtEntity> {
-    return this.debtService.markAsPaid(id);
+  markAsPaid(@Param('id', ParseIntPipe) id: number, @Request() req: any): Promise<DebtEntity> {
+    return this.debtService.markAsPaid(id, req.user?.id);
   }
 
   // Crear un pago/abono para una deuda
@@ -90,9 +99,14 @@ export class DebtController {
   @UsePipes(new ValidationPipe({ transform: true }))
   createPayment(
     @Param('id', ParseIntPipe) debtId: number,
-    @Body() createPaymentDto: CreatePaymentDto
+    @Body() createPaymentDto: CreatePaymentDto,
+    @Request() req: any
   ): Promise<PaymentEntity> {
-    return this.debtService.createPayment(debtId, createPaymentDto);
+    const paymentWithUser = {
+      ...createPaymentDto,
+      userId: req.user?.id
+    };
+    return this.debtService.createPayment(debtId, paymentWithUser);
   }
 
   // Obtener historial de pagos de una deuda

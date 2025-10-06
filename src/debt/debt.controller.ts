@@ -11,7 +11,10 @@ import {
   ValidationPipe,
   Request,
   UseGuards,
+  Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { DebtService } from './debt.service';
 import { CreateDebtDto } from './dto/create-debt.dto';
 import { UpdateDebtDto } from './dto/update-debt.dto';
@@ -113,5 +116,33 @@ export class DebtController {
   @Get(':id/payments')
   getPaymentsByDebt(@Param('id', ParseIntPipe) debtId: number): Promise<PaymentEntity[]> {
     return this.debtService.getPaymentsByDebt(debtId);
+  }
+
+  // Exportar deudas en JSON o CSV
+  @Get('export/:format')
+  async exportDebts(
+    @Param('format') format: 'json' | 'csv',
+    @Request() req: any,
+    @Res() res: Response
+  ) {
+    const userId = req.user?.id;
+    const data = await this.debtService.exportDebts(userId, format);
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="deudas.csv"');
+      return res.send(data);
+    }
+    
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="deudas.json"');
+    return res.json(data);
+  }
+
+  // Obtener agregaciones de deudas
+  @Get('stats/aggregations')
+  getAggregations(@Request() req: any) {
+    const userId = req.user?.id;
+    return this.debtService.getAggregations(userId);
   }
 }

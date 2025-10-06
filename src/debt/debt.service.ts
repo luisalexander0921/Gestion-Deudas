@@ -300,4 +300,71 @@ export class DebtService {
       throw new HttpException('Error al obtener los pagos de la deuda', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  async exportDebts(userId: number, format: 'json' | 'csv'): Promise<any> {
+    try {
+      const debts = await this.debtRepository.find({
+        where: { userId, recordStatus: RecordStatus.ACTIVE },
+        relations: ['user', 'creditor', 'payments'],
+        order: { createdAt: 'DESC' },
+      });
+
+      const exportData = debts.map(debt => ({
+        id: debt.id,
+        description: debt.description,
+        amount: debt.amount,
+        paidAmount: debt.paidAmount || 0,
+        remainingAmount: debt.remainingAmount || debt.amount,
+        status: debt.status,
+        dueDate: debt.dueDate,
+        creditorName: debt.creditor?.name || 'N/A',
+        createdAt: debt.createdAt,
+        paymentsCount: debt.payments?.length || 0
+      }));
+
+      if (format === 'csv') {
+        const headers = 'ID,Descripción,Monto Total,Monto Pagado,Saldo Pendiente,Estado,Fecha Vencimiento,Acreedor,Fecha Creación,Número de Pagos\n';
+        const csvData = exportData.map(debt => 
+          `${debt.id},"${debt.description}",${debt.amount},${debt.paidAmount},${debt.remainingAmount},${debt.status},${debt.dueDate || ''},"${debt.creditorName}",${debt.createdAt},${debt.paymentsCount}`
+        ).join('\n');
+        return headers + csvData;
+      }
+
+      return exportData;
+    } catch (error) {
+      throw new HttpException('Error al exportar las deudas', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async getAggregations(userId: number): Promise<any> {
+    try {
+      const result = await this.debtRepository.query(`
+        SELECT 
+          COUNT(*) as total_debts,
+          COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_debts,
+          COUNT(CASE WHEN status = 'PAID' THEN 1 END) as paid_debts,
+          COALESCE(SUM(amount), 0) as total_amount,
+          COALESCE(SUM("paidAmount"), 0) as total_paid,
+          COALESCE(SUM("remainingAmount"), 0) as total_remaining,
+          COALESCE(AVG(amount), 0) as average_debt_amount
+        FROM debts 
+        WHERE "userId" = $1 AND "recordStatus" = 'ACTIVE'
+      `, [userId]);
+
+      const aggregation = result[0];
+      
+      return {
+        totalDebts: parseInt(aggregation.total_debts),
+        pendingDebts: parseInt(aggregation.pending_debts),
+        paidDebts: parseInt(aggregation.paid_debts),
+        totalAmount: parseFloat(aggregation.total_amount),
+        totalPaid: parseFloat(aggregation.total_paid),
+        totalRemaining: parseFloat(aggregation.total_remaining),
+        averageDebtAmount: parseFloat(aggregation.average_debt_amount),
+        paymentRate: aggregation.total_debts > 0 ? (parseFloat(aggregation.total_paid) / parseFloat(aggregation.total_amount) * 100).toFixed(2) : '0.00'
+      };
+    } catch (error) {
+      throw new HttpException('Error al obtener las agregaciones', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 }

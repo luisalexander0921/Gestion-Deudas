@@ -14,7 +14,9 @@ import { DebtService } from './debt.service';
 import { CreateDebtDto } from './dto/create-debt.dto';
 import { UpdateDebtDto } from './dto/update-debt.dto';
 import { FilterDebtDto } from './dto/filter-debt.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
 import { DebtEntity } from './debt.entity';
+import { PaymentEntity } from './payment.entity';
 
 @Controller('debt')
 export class DebtController {
@@ -81,5 +83,21 @@ export class DebtController {
   @Patch(':id/mark-paid')
   markAsPaid(@Param('id', ParseIntPipe) id: number): Promise<DebtEntity> {
     return this.debtService.markAsPaid(id);
+  }
+
+  // Crear un pago/abono para una deuda
+  @Post(':id/payments')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  createPayment(
+    @Param('id', ParseIntPipe) debtId: number,
+    @Body() createPaymentDto: CreatePaymentDto
+  ): Promise<PaymentEntity> {
+    return this.debtService.createPayment(debtId, createPaymentDto);
+  }
+
+  // Obtener historial de pagos de una deuda
+  @Get(':id/payments')
+  getPaymentsByDebt(@Param('id', ParseIntPipe) debtId: number): Promise<PaymentEntity[]> {
+    return this.debtService.getPaymentsByDebt(debtId);
   }
 }

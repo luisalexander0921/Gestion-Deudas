@@ -6,10 +6,12 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { CreditorEntity } from '../creditor/creditor.entity';
 import { DebtStatus, RecordStatus } from '../common/enums';
+import { PaymentEntity } from './payment.entity';
 
 @Entity({ name: 'debts' })
 export class DebtEntity {
@@ -27,6 +29,12 @@ export class DebtEntity {
 
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   amount: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  paidAmount: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  remainingAmount: number;
 
   @Column({ length: 255, nullable: true })
   description: string;
@@ -55,4 +63,8 @@ export class DebtEntity {
   @ManyToOne(() => CreditorEntity, (creditor) => creditor.debts)
   @JoinColumn({ name: 'creditorId' })
   creditor: CreditorEntity;
+
+  // Relación con Payments
+  @OneToMany(() => PaymentEntity, (payment) => payment.debt)
+  payments: PaymentEntity[];
 }

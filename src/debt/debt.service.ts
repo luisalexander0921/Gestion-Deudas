@@ -2,9 +2,11 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, Between } from 'typeorm';
 import { DebtEntity } from './debt.entity';
+import { PaymentEntity } from './payment.entity';
 import { CreateDebtDto } from './dto/create-debt.dto';
 import { UpdateDebtDto } from './dto/update-debt.dto';
 import { FilterDebtDto } from './dto/filter-debt.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
 import { DebtStatus, RecordStatus } from '../common/enums';
 
 @Injectable()
@@ -12,31 +14,21 @@ export class DebtService {
   constructor(
     @InjectRepository(DebtEntity)
     private debtRepository: Repository<DebtEntity>,
+    @InjectRepository(PaymentEntity)
+    private paymentRepository: Repository<PaymentEntity>,
   ) {}
 
   async create(createDebtDto: CreateDebtDto): Promise<DebtEntity> {
     try {
-      // Validar que el monto no sea negativo
       if (createDebtDto.amount <= 0) {
         throw new HttpException('El monto de la deuda debe ser mayor a cero', HttpStatus.BAD_REQUEST);
-      }
-
-      // Verificar si ya existe una deuda pendiente para este acreedor
-      const existingDebt = await this.debtRepository.findOne({
-        where: {
-          creditorId: createDebtDto.creditorId,
-          status: DebtStatus.PENDING,
-          recordStatus: RecordStatus.ACTIVE,
-        },
-      });
-
-      if (existingDebt) {
-        throw new HttpException('Ya existe una deuda pendiente para este acreedor', HttpStatus.CONFLICT);
       }
 
       const debtData = {
         ...createDebtDto,
         status: createDebtDto.status || DebtStatus.PENDING,
+        paidAmount: 0,
+        remainingAmount: createDebtDto.amount,
       };
       const debt = this.debtRepository.create(debtData);
       return this.debtRepository.save(debt);
@@ -52,7 +44,7 @@ export class DebtService {
     try {
       return this.debtRepository.find({
         where: { recordStatus: RecordStatus.ACTIVE },
-        relations: ['user', 'creditor'],
+        relations: ['user', 'creditor', 'payments'],
         order: { createdAt: 'DESC' },
       });
     } catch (error) {
@@ -64,7 +56,7 @@ export class DebtService {
     try {
       const debt = await this.debtRepository.findOne({
         where: { id, recordStatus: RecordStatus.ACTIVE },
-        relations: ['user', 'creditor'],
+        relations: ['user', 'creditor', 'payments'],
       });
 
       if (!debt) {
@@ -84,12 +76,10 @@ export class DebtService {
     try {
       const debt = await this.getOne(id);
       
-      // Validar que no se pueda modificar una deuda pagada
       if (debt.status === DebtStatus.PAID) {
         throw new HttpException('No se puede modificar una deuda que ya está pagada', HttpStatus.BAD_REQUEST);
       }
 
-      // Validar que el nuevo monto no sea negativo (si se está actualizando)
       if (updateDebtDto.amount !== undefined && updateDebtDto.amount <= 0) {
         throw new HttpException('El monto de la deuda debe ser mayor a cero', HttpStatus.BAD_REQUEST);
       }
@@ -209,13 +199,77 @@ export class DebtService {
         throw new HttpException('La deuda ya está marcada como pagada', HttpStatus.BAD_REQUEST);
       }
 
-      debt.status = DebtStatus.PAID;
-      return this.debtRepository.save(debt);
+      const remainingAmount = debt.remainingAmount ?? debt.amount;
+      await this.createPayment(id, {
+        amount: remainingAmount,
+        description: 'Pago total de la deuda',
+        userId: debt.userId,
+      });
+
+      return this.getOne(id);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
       throw new HttpException('Error al marcar la deuda como pagada', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async createPayment(debtId: number, createPaymentDto: CreatePaymentDto): Promise<PaymentEntity> {
+    try {
+      const debt = await this.getOne(debtId);
+      
+      if (debt.status === DebtStatus.PAID) {
+        throw new HttpException('No se pueden hacer pagos a una deuda ya pagada', HttpStatus.BAD_REQUEST);
+      }
+
+      const remainingAmount = debt.remainingAmount ?? debt.amount;
+      
+      if (createPaymentDto.amount > remainingAmount) {
+        throw new HttpException('El monto del pago no puede ser mayor al saldo pendiente', HttpStatus.BAD_REQUEST);
+      }
+
+      const result = await this.paymentRepository.query(
+        'INSERT INTO payments (amount, description, "debtId", "userId", "createdAt") VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
+        [createPaymentDto.amount, createPaymentDto.description, debtId, createPaymentDto.userId]
+      );
+      
+      const savedPayment = result[0];
+
+      const currentPaidAmount = parseFloat(debt.paidAmount?.toString() || '0');
+      const paymentAmount = parseFloat(createPaymentDto.amount.toString());
+      const totalAmount = parseFloat(debt.amount.toString());
+      
+      const newPaidAmount = currentPaidAmount + paymentAmount;
+      const newRemainingAmount = totalAmount - newPaidAmount;
+      
+      // Actualizar deuda con consulta SQL directa
+      const status = newRemainingAmount <= 0 ? 'PAID' : debt.status;
+      const finalRemainingAmount = newRemainingAmount <= 0 ? 0 : newRemainingAmount;
+      
+      await this.debtRepository.query(
+        'UPDATE debts SET "paidAmount" = $1, "remainingAmount" = $2, status = $3 WHERE id = $4',
+        [newPaidAmount, finalRemainingAmount, status, debtId]
+      );
+      
+      return savedPayment;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException('Error al crear el pago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async getPaymentsByDebt(debtId: number): Promise<PaymentEntity[]> {
+    try {
+      return this.paymentRepository.find({
+        where: { debtId },
+        relations: ['user'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      throw new HttpException('Error al obtener los pagos de la deuda', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }
